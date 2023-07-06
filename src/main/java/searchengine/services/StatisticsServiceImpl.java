@@ -8,48 +8,66 @@ import searchengine.dto.statistics.DetailedStatisticsItem;
 import searchengine.dto.statistics.StatisticsData;
 import searchengine.dto.statistics.StatisticsResponse;
 import searchengine.dto.statistics.TotalStatistics;
+import searchengine.model.SiteEntity;
+import searchengine.repositories.LemmaRepository;
+import searchengine.repositories.PageRepository;
+import searchengine.repositories.SiteRepository;
 
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Random;
 
 @Service
 @RequiredArgsConstructor
 public class StatisticsServiceImpl implements StatisticsService {
-
-    private final Random random = new Random();
+    private final SiteRepository siteRepository;
+    private final PageRepository pageRepository;
+    private final LemmaRepository lemmaRepository;
     private final SitesList sites;
 
     @Override
     public StatisticsResponse getStatistics() {
-        String[] statuses = { "INDEXED", "FAILED", "INDEXING" };
-        String[] errors = {
-                "Ошибка индексации: главная страница сайта не доступна",
-                "Ошибка индексации: сайт не доступен",
-                ""
-        };
-
         TotalStatistics total = new TotalStatistics();
-        total.setSites(sites.getSites().size());
-        total.setIndexing(true);
+        int sitesCount = siteRepository.sitesCount();
+        total.setSites(sitesCount);
+        total.setIndexing(true); // что это и где взять результат окончания индексации?
 
         List<DetailedStatisticsItem> detailed = new ArrayList<>();
         List<Site> sitesList = sites.getSites();
-        for(int i = 0; i < sitesList.size(); i++) {
-            Site site = sitesList.get(i);
+        if (sitesCount != 0) {
+            for (Site site : sitesList) {
+                DetailedStatisticsItem item = new DetailedStatisticsItem();
+                item.setName(site.getName());
+                item.setUrl(site.getUrl());
+
+                SiteEntity siteEntity = siteRepository.site(site.getUrl());
+                item.setStatus(String.valueOf(siteEntity.getStatus()));
+                item.setError(siteEntity.getLastError());
+                item.setIndexingTime(siteEntity.getIndexingTime());
+
+                ZonedDateTime zdt = ZonedDateTime.of(siteEntity.getStatusTime(), ZoneId.systemDefault());
+                long dateLong = zdt.toInstant().toEpochMilli();
+                item.setStatusTime(dateLong);
+
+                int pages = pageRepository.pagesCount(siteEntity.getId());
+                item.setPages(pages);
+
+                int lemmas = lemmaRepository.lemmaCount(siteEntity.getId());
+                item.setLemmas(lemmas);
+
+                int notFound = pageRepository.httpNotFound(siteEntity.getId());
+                item.setNotFound(notFound);
+
+                total.setPages(total.getPages() + pages);
+                total.setLemmas(total.getLemmas() + lemmas);
+                total.setNotFound(total.getNotFound() + notFound);
+                detailed.add(item);
+            }
+        } else {
             DetailedStatisticsItem item = new DetailedStatisticsItem();
-            item.setName(site.getName());
-            item.setUrl(site.getUrl());
-            int pages = random.nextInt(1_000);
-            int lemmas = pages * random.nextInt(1_000);
-            item.setPages(pages);
-            item.setLemmas(lemmas);
-            item.setStatus(statuses[i % 3]);
-            item.setError(errors[i % 3]);
-            item.setStatusTime(System.currentTimeMillis() -
-                    (random.nextInt(10_000)));
-            total.setPages(total.getPages() + pages);
-            total.setLemmas(total.getLemmas() + lemmas);
+            item.setName("Site name");
+            item.setUrl("http://somesite.info");
             detailed.add(item);
         }
 
@@ -58,7 +76,7 @@ public class StatisticsServiceImpl implements StatisticsService {
         data.setTotal(total);
         data.setDetailed(detailed);
         response.setStatistics(data);
-        response.setResult(true);
+        response.setResult(true); // что это?
         return response;
     }
 }

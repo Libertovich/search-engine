@@ -1,0 +1,54 @@
+indexing-settings:
+  sites: # формат url без слеша на конце
+    - url: http://akvagaz.ru # 2 сек, страниц 52
+      name: Аквагаз
+    - url: https://www.svetlovka.ru # 11 сек, страниц 190
+      name: Библиотека Светловка
+    - url: https://playback.ru # 106 сек, страниц 2155
+      name: PlayBack.Ru
+    - url: https://ipfran.ru # 248 сек, страниц 1047
+      name: ИПФ РАН
+#    - url: https://skillbox.ru # 1256? сек, страниц 9353 и засыпает...
+#      name: Skillbox
+#    - url: https://lenta.ru # ? сек, страниц 28732+
+#      name: Лента.ру
+#    - url: https://volochek.life # не показывает время выполнения, http code 500
+#      name: Вышний Волочек
+#    - url: http://radiomv.ru # не индексирует, был http code 503, 3 сек
+#      name: Милицейская волна
+#    - url: https://dombulgakova.ru # не пускает, http code 403
+#      name: Дом Булгакова
+
+jsoup-settings:
+  jsoup:
+    userAgent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/111.0.0.0 Safari/537.36 Edg/111.0.1661.62
+    referrer: https://www.google.com
+#    ignoreHttpErrors: true
+#    timeout: 5000
+#    followRedirects: false
+
+server:
+  port: 8080
+
+spring:
+  datasource:
+    url: jdbc:mysql://localhost:3306/search_engine?useSSL=false&requireSSL=false&allowPublicKeyRetrieval=true
+    username: root
+    password: My138753Kblth+
+  jpa:
+    show-sql: true
+    hibernate:
+      ddl-auto: create
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQLDialect
+      jakarta:
+        persistence:
+          sharedCache:
+            mode: UNSPECIFIED #нужно при использовании Spring Boot v.3.0 и выше
+
+logging:
+  level:
+    root: info
+
+# spring.jpa.open-in-view

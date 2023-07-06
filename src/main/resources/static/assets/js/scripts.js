@@ -1587,6 +1587,7 @@ var API = function(){
                     $('#totalSites').text(result.statistics.total.sites);
                     $('#totalPages').text(result.statistics.total.pages);
                     $('#totalLemmas').text(result.statistics.total.lemmas);
+                    $('#totalNotFound').text(result.statistics.total.notFound);
                     $('select[name="site"] option').not(':first-child').remove();
                     result.statistics.detailed.forEach(function(site){
                         var $blockSiteExample = $('.Statistics-example').clone(true);
@@ -1617,14 +1618,16 @@ var API = function(){
                             .html('<div class="Statistics-option"><strong>Status time:</strong> ' +
                                 time.getDate() + '.' +
                                 (time.getMonth() + 1) + '.' +
-                                time.getFullYear() + ' ' +
+                                time.getFullYear() + ' - ' +
                                 time.getHours() + ':' +
                                 time.getMinutes() + ':' +
                                 time.getSeconds() +
                                 '</div><div class="Statistics-option"><strong>Pages:</strong> ' + site.pages +
                                 '</div><div class="Statistics-option"><strong>Lemmas:</strong> ' + site.lemmas +
-                                '</div><div class="Statistics-option Statistics-option_error"><strong>Error:</strong> ' + site.error + '</div>'+
-                                '')
+                                '</div><div class="Statistics-option Statistics-option_error"><strong>Last error:</strong> ' + site.error +
+                                '</div><div class="Statistics-option"><strong>Not found:</strong> ' + site.notFound +
+                                '</div><div class="Statistics-option"><strong>Indexing time:</strong> ' + site.indexingTime + ' s' +
+                                '</div>' + '')
     
                         
                         $statistics.append($blockSiteExample);
@@ -1649,6 +1652,7 @@ var API = function(){
                         });
                     });
                     if (result.statistics.total.isIndexing) {
+//                    if (result.statistics.total.indexing) { // замена предыдущей строки для чего-то?
                         var $btnIndex = $('.btn[data-send="startIndexing"]'),
                             text = $btnIndex.find('.btn-content').text();
                         $btnIndex.find('.btn-content').text($btnIndex.data('alttext'));
