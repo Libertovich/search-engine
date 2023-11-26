@@ -15,6 +15,6 @@ public interface PageRepository extends JpaRepository<PageEntity, Integer> {
     @Query(value = "SELECT COUNT(*) FROM page WHERE site_id = :siteId AND code = 404", nativeQuery = true)
     int httpNotFound(int siteId);
 
-    @Query(value = "SELECT path FROM page WHERE path = :path AND site_id = :siteId", nativeQuery = true)
-    Optional<String> findByPathAndSite(String path, int siteId);
+//    @Query(value = "SELECT path FROM page WHERE path = :path AND site_id = :siteId", nativeQuery = true)
+//    Optional<String> findByPathAndSite(String path, int siteId);
 }

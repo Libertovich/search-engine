@@ -33,7 +33,7 @@ public class SiteEntity {
     @Column(name = "last_error", columnDefinition = "TEXT")
     private String lastError;
 
-    @Column(name = "indexing_time") // добавил сам
+    @Column(name = "indexing_time")
     private int indexingTime;
 
     @OneToMany(mappedBy = "siteId", cascade = CascadeType.MERGE, fetch = FetchType.LAZY) // двунаправленная связь

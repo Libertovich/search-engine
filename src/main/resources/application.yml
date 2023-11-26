@@ -6,8 +6,8 @@ indexing-settings:
       name: Библиотека Светловка
     - url: https://playback.ru # 106 сек, страниц 2155
       name: PlayBack.Ru
-    - url: https://ipfran.ru # 248 сек, страниц 1047
-      name: ИПФ РАН
+#    - url: https://ipfran.ru # 248 сек, страниц 1047
+#      name: ИПФ РАН
 #    - url: https://skillbox.ru # 1256? сек, страниц 9353 и засыпает...
 #      name: Skillbox
 #    - url: https://lenta.ru # ? сек, страниц 28732+
@@ -19,16 +19,12 @@ indexing-settings:
 #    - url: https://dombulgakova.ru # не пускает, http code 403
 #      name: Дом Булгакова
 
-jsoup-settings:
-  jsoup:
-    userAgent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/111.0.0.0 Safari/537.36 Edg/111.0.1661.62
-    referrer: https://www.google.com
-#    ignoreHttpErrors: true
-#    timeout: 5000
-#    followRedirects: false
-
-server:
-  port: 8080
+#jsoup-settings:
+#  userAgent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/111.0.0.0 Safari/537.36 Edg/111.0.1661.62
+#  referrer: https://www.google.com
+#  ignoreHttpErrors: true
+#  timeout: 5000
+#  followRedirects: false
 
 spring:
   datasource:
@@ -40,15 +36,17 @@ spring:
     hibernate:
       ddl-auto: create
     properties:
-      hibernate:
-        dialect: org.hibernate.dialect.MySQLDialect
       jakarta:
         persistence:
           sharedCache:
-            mode: UNSPECIFIED #нужно при использовании Spring Boot v.3.0 и выше
+            mode: UNSPECIFIED # нужно при использовании Spring Boot v.3.0 и выше
+#      hibernate:
+#        dialect: org.hibernate.dialect.MySQLDialect # теперь не нужно по умолчанию
+#    open-in-view: # настроить при необходимости
+
+server:
+  port: 8080
 
 logging:
   level:
     root: info
-
-# spring.jpa.open-in-view

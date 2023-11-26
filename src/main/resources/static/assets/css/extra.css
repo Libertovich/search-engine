@@ -38,6 +38,7 @@
   position: relative;
   padding: 0 25px;
   background-color: #fafafa;
+  border: 1px solid #177db8; /*добавил Libertovich*/
 }
 @media screen and (max-width: 480px) {
   .HideBlock {
@@ -124,6 +125,16 @@
   transition: -webkit-transform 200ms;
   transition: transform 200ms;
   transition: transform 200ms, -webkit-transform 200ms;
+}
+
+.header {  /*добавил Libertovich*/
+  font-size: 2.5rem;
+  color: #177db8;
+  letter-spacing: 3px;
+  word-spacing: 5px;
+  text-align: center;
+  margin-bottom: 0px;
+  padding-top: 20px;
 }
 
 .Middle {
@@ -809,6 +820,7 @@
 }
 .Tabs-link_ACTIVE {
   border-color: #177db8;
+  background: azure; /*добавил Libertovich*/
 }
 .Tabs-icon {
   max-width: 35px;

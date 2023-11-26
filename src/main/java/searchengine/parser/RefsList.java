@@ -1,4 +1,4 @@
-package searchengine.dto.indexing;
+package searchengine.parser;
 
 import java.util.Collections;
 import java.util.HashSet;
