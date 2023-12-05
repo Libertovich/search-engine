@@ -1651,8 +1651,8 @@ var API = function(){
                             $this.removeClass('Tabs-block_update')
                         });
                     });
-                    if (result.statistics.total.isIndexing) {
-//                    if (result.statistics.total.indexing) { // замена предыдущей строки для чего-то?
+ //                   if (result.statistics.total.isIndexing) {  // так рекомендуют студенты
+                    if (result.statistics.total.indexing) { // так было: замена предыдущей строки для чего-то?
                         var $btnIndex = $('.btn[data-send="startIndexing"]'),
                             text = $btnIndex.find('.btn-content').text();
                         $btnIndex.find('.btn-content').text($btnIndex.data('alttext'));

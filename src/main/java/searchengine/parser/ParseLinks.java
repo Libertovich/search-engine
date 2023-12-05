@@ -12,6 +12,7 @@ import searchengine.model.PageEntity;
 import searchengine.model.SiteEntity;
 import searchengine.repositories.PageRepository;
 import searchengine.repositories.SiteRepository;
+import searchengine.services.IndexingServiceImpl;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -55,7 +56,7 @@ public class ParseLinks extends RecursiveTask<Boolean> {
             for (Element link : elements) {
                 String fetchedLink = link.absUrl("href");
                 if (isCorrectLink(fetchedLink, siteEntity.getUrl())) {
-                    if (!refsList.isRefPresent(fetchedLink)) {
+                    if (!refsList.isRefPresent(fetchedLink) && !IndexingServiceImpl.isStopped) {
                         refsList.addRef(fetchedLink);
 
                         ParseLinks task = new ParseLinks(siteEntity, fetchedLink, refsList, siteRepository, pageRepository);
