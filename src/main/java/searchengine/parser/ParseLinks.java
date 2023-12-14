@@ -14,16 +14,17 @@ import searchengine.repositories.PageRepository;
 import searchengine.repositories.SiteRepository;
 import searchengine.services.IndexingServiceImpl;
 
-import java.time.LocalDateTime;
+import java.net.UnknownHostException;
 import java.util.List;
 import java.util.ArrayList;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.ForkJoinTask;
 import java.util.concurrent.RecursiveTask;
 
 @Log4j2
 @RequiredArgsConstructor
 //@ConfigurationProperties(prefix = "jsoup-settings") // настроить подключение
-public class ParseLinks extends RecursiveTask<Boolean> {
+public class ParseLinks extends RecursiveTask<String> {
     private final SiteEntity siteEntity;
     private final String ref;
     private final RefsList refsList; // делал final нестатик, передавал из fjp как параметр. Время -3% и еще один параметр для передачи
@@ -31,8 +32,9 @@ public class ParseLinks extends RecursiveTask<Boolean> {
     private final PageRepository pageRepository;
 
     @Override
-    protected Boolean compute() {
+    protected String compute() {
         List<ParseLinks> taskList = new ArrayList<>();
+        String url = siteEntity.getUrl();
 
 //        try {
 //            Thread.sleep(5000);
@@ -49,31 +51,47 @@ public class ParseLinks extends RecursiveTask<Boolean> {
                     .followRedirects(true) // убирает коды НТТР 301 и 302
                     .execute();
 
-            Document doc = response.parse();
-            savePage(response.statusCode(), ref, doc.html(), siteEntity);
+            int statusCode = response.statusCode();
+            if (statusCode == 200) {
+                Document doc = response.parse();
+                savePage(statusCode, ref, doc.html(), siteEntity);
 //            saveStatusTime(); // зачем это нужно? сильно замедляет работу
-            Elements elements = doc.select("body").select("a");
-            for (Element link : elements) {
-                String fetchedLink = link.absUrl("href");
-                if (isCorrectLink(fetchedLink, siteEntity.getUrl())) {
-                    if (!refsList.isRefPresent(fetchedLink) && !IndexingServiceImpl.isStopped) {
-                        refsList.addRef(fetchedLink);
+                Elements elements = doc.select("body").select("a");
+                for (Element link : elements) {
+                    String fetchedLink = link.absUrl("href");
+                    if (isCorrectLink(fetchedLink, url)) {
+                        if (!refsList.isRefPresent(fetchedLink) && !IndexingServiceImpl.isStopped) {
+                            refsList.addRef(fetchedLink);
 
-                        ParseLinks task = new ParseLinks(siteEntity, fetchedLink, refsList, siteRepository, pageRepository);
-                        task.fork();
-                        taskList.add(task);
+                            ParseLinks task = new ParseLinks(siteEntity, fetchedLink, refsList, siteRepository, pageRepository);
+                            task.fork();
+                            taskList.add(task);
+                        }
                     }
                 }
+                taskList.forEach(ForkJoinTask::join);
+            } else {
+                savePage(statusCode, ref, "Not found", siteEntity);
+                log.info(AnsiColor.ANSI_RED + "Exc: " + AnsiColor.ANSI_PURPLE
+                        + "HTTP 404, Not found, " + AnsiColor.ANSI_RESET + ref);
             }
-
-            taskList.forEach(ForkJoinTask::join);
+        } catch (UnknownHostException e) {
+            log.info(AnsiColor.ANSI_RED + "Exc: " + AnsiColor.ANSI_PURPLE
+                    + "Сайт " + url + " не найден!" + AnsiColor.ANSI_RESET);
+            return "UnknownHost";
+        } catch (CancellationException cex) {
+            log.info(AnsiColor.ANSI_RED + "Exc: " + AnsiColor.ANSI_PURPLE
+                    + "Индексация " + url + " прервана пользователем" + AnsiColor.ANSI_RESET);
+            return "Interrupted";
         } catch (Exception ex) {
-            if (ex.getMessage() == null) {
-                return false;
-            }
             httpCodeCheck(ex);
         }
-        return true;
+
+        if (IndexingServiceImpl.isStopped) {  // если нажата СТОП, но не весь сайт проиндексирован
+            return "Interrupted";
+        }
+
+        return "OK";
     }
 
     private void savePage(int statusCode, String ref, String html, SiteEntity siteEntity) {
@@ -83,11 +101,6 @@ public class ParseLinks extends RecursiveTask<Boolean> {
         page.setContent(html);
         page.setSiteId(siteEntity);
         pageRepository.save(page);
-    }
-
-    private void saveStatusTime() {
-        siteEntity.setStatusTime(LocalDateTime.now());
-        siteRepository.save(siteEntity);
     }
 
     private String getRelativePath(String ref) {
@@ -107,21 +120,17 @@ public class ParseLinks extends RecursiveTask<Boolean> {
 
     private void httpCodeCheck(Exception ex) {
         String msg = ex.getMessage();
-        if (msg.contains("Status=404")) {
-            savePage(404, ref, msg, siteEntity);
-            log.info(AnsiColor.ANSI_YELLOW + "Reference info: " + AnsiColor.ANSI_PURPLE
-                    + "HTTP 404, Not found, " + AnsiColor.ANSI_RESET + ref);
-        } else if (msg.contains("Unhandled content type")) {
+        if (msg.contains("Unhandled content type")) {
             savePage(405, ref, msg, siteEntity);
-            log.info(AnsiColor.ANSI_GREEN + "Reference info: " + AnsiColor.ANSI_PURPLE
+            log.info(AnsiColor.ANSI_RED + "Exc: " + AnsiColor.ANSI_PURPLE
                     + "HTTP 405, Unhandled content type, " + AnsiColor.ANSI_RESET + ref);
         } else if (msg.contains("Status=500")) {
             savePage(500, ref, msg, siteEntity);
-            log.error(AnsiColor.ANSI_RED + "Reference info: " + AnsiColor.ANSI_YELLOW
+            log.error(AnsiColor.ANSI_RED + "Exc: "
                     + "HTTP 500, Internal server error, " + AnsiColor.ANSI_RESET + ref);
         } else {
             savePage(888, ref, msg, siteEntity);
-            log.info(AnsiColor.ANSI_YELLOW + "Info: " + msg + AnsiColor.ANSI_RESET + ref);
+            log.info(AnsiColor.ANSI_RED + "Exc: " + msg + AnsiColor.ANSI_RESET + " " + ref);
         }
     }
 }

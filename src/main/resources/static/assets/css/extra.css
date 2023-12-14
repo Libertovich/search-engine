@@ -133,8 +133,8 @@
   letter-spacing: 3px;
   word-spacing: 5px;
   text-align: center;
-  margin-bottom: 0px;
-  padding-top: 20px;
+  background: radial-gradient(60% 90%, azure, #5ac4f2);
+  padding: 15px;
 }
 
 .Middle {
@@ -820,7 +820,7 @@
 }
 .Tabs-link_ACTIVE {
   border-color: #177db8;
-  background: azure; /*добавил Libertovich*/
+  background: #d9f8ff; /*добавил Libertovich*/
 }
 .Tabs-icon {
   max-width: 35px;

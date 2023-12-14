@@ -8,5 +8,5 @@ public class TotalStatistics {
     private int pages;
     private int lemmas;
     private int notFound;
-    private boolean indexing;
+    private boolean isIndexing;  // было изначально indexing
 }

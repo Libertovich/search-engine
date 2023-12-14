@@ -2,9 +2,9 @@ indexing-settings:
   sites: # формат url без слеша на конце
     - url: http://akvagaz.ru # 2 сек, страниц 52
       name: Аквагаз
-    - url: https://www.svetlovka.ru # 11 сек, страниц 190
+    - url: https://www.svetlovka.ru # 10 сек, страниц 239
       name: Библиотека Светловка
-    - url: https://playback.ru # 106 сек, страниц 2155
+    - url: https://playback.ru # 106(142) сек, страниц 2155(2107)
       name: PlayBack.Ru
 #    - url: https://ipfran.ru # 248 сек, страниц 1047
 #      name: ИПФ РАН
@@ -12,7 +12,7 @@ indexing-settings:
 #      name: Skillbox
 #    - url: https://lenta.ru # ? сек, страниц 28732+
 #      name: Лента.ру
-#    - url: https://volochek.life # не показывает время выполнения, http code 500
+#    - url: https://volochek.life # вызывает исключение Premature EOF, иногда http code 500
 #      name: Вышний Волочек
 #    - url: http://radiomv.ru # не индексирует, был http code 503, 3 сек
 #      name: Милицейская волна
@@ -32,7 +32,7 @@ spring:
     username: root
     password: My138753Kblth+
   jpa:
-    show-sql: true
+#    show-sql: true
     hibernate:
       ddl-auto: create
     properties:
