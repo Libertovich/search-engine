@@ -4,6 +4,9 @@ import lombok.Getter;
 import lombok.Setter;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.OnDelete;
+import org.hibernate.annotations.OnDeleteAction;
+
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -37,5 +40,6 @@ public class SiteEntity {
     private int indexingTime;
 
     @OneToMany(mappedBy = "siteId", cascade = CascadeType.MERGE, fetch = FetchType.LAZY) // двунаправленная связь
+    @OnDelete(action = OnDeleteAction.CASCADE)
     private List<PageEntity> page = new ArrayList<>();
 }

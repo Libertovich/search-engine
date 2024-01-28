@@ -1,30 +1,23 @@
 indexing-settings:
   sites: # формат url без слеша на конце
-    - url: http://akvagaz.ru # 2 сек, страниц 52
-      name: Аквагаз
-    - url: https://www.svetlovka.ru # 10 сек, страниц 239
+#    - url: http://akvagaz.ru # 1 сек, страниц 53
+#      name: Аквагаз
+    - url: https://www.svetlovka.ru # 10 сек, страниц 236
       name: Библиотека Светловка
-    - url: https://playback.ru # 106(142) сек, страниц 2155(2107)
-      name: PlayBack.Ru
-#    - url: https://ipfran.ru # 248 сек, страниц 1047
-#      name: ИПФ РАН
-#    - url: https://skillbox.ru # 1256? сек, страниц 9353 и засыпает...
-#      name: Skillbox
-#    - url: https://lenta.ru # ? сек, страниц 28732+
-#      name: Лента.ру
-#    - url: https://volochek.life # вызывает исключение Premature EOF, иногда http code 500
-#      name: Вышний Волочек
-#    - url: http://radiomv.ru # не индексирует, был http code 503, 3 сек
-#      name: Милицейская волна
-#    - url: https://dombulgakova.ru # не пускает, http code 403
+    - url: https://radiomv0.ru # 176 сек, страниц 172 (с задержкой 1500мс)
+      name: Милицейская волна
+#    - url: https://playback.ru # 144 сек, страниц 2078
+#      name: PlayBack.Ru
+#    - url: https://dombulgakova.ru # 147 сек, страниц 529, (поменять userAgent, иногда ввести задержку)
 #      name: Дом Булгакова
-
-#jsoup-settings:
-#  userAgent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/111.0.0.0 Safari/537.36 Edg/111.0.1661.62
-#  referrer: https://www.google.com
-#  ignoreHttpErrors: true
-#  timeout: 5000
-#  followRedirects: false
+#    - url: https://ipfran.ru # 330 сек, страниц 1046
+#      name: ИПФ РАН
+#    - url: https://volochek.life # 2652 сек, страниц 5275 (с задержкой 100мс)
+#      name: Вышний Волочек
+#    - url: https://skillbox.ru # ??? сек, страниц 10925+ и `Java heap space`...
+#      name: Skillbox
+#    - url: https://lenta.ru # ??? сек, страниц 28732+ и `StackOverflowError`...
+#      name: Лента.ру
 
 spring:
   datasource:
@@ -35,6 +28,8 @@ spring:
 #    show-sql: true
     hibernate:
       ddl-auto: create
+#      connection: # если `Unable to commit against JDBC Connection`
+#        handling_mode: DELAYED_ACQUISITION_AND_RELEASE_AFTER_STATEMENT
     properties:
       jakarta:
         persistence:

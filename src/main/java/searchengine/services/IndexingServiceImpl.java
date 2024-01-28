@@ -13,6 +13,8 @@ import searchengine.parser.ParseLinks;
 import searchengine.repositories.PageRepository;
 import searchengine.repositories.SiteRepository;
 
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -37,14 +39,18 @@ public class IndexingServiceImpl implements IndexingService {
         IndexingResponse response = new IndexingResponse();
         indexingSites = new ArrayList<>();
 
-        if (isStopped) {  // если индексация не запущена (остановлена)
-            isStopped = false;  // снимаем флаг СТОП
-            List<Site> sites = sitesList.getSites();  // получаем список сайтов для индексации
+        if (isStopped) {
+            isStopped = false;
+//            log.info("Начало очистки базы");
+            siteRepository.clearSiteTable();
+//            log.info("Окончание очистки базы");
 
-            for (Site site : sites) {  // в цикле получаем сайт и запускаем индексацию
+            List<Site> sites = sitesList.getSites();
+            for (Site site : sites) {
                 Thread thread = getThread(site.getUrl(), site.getName());
                 thread.start();
             }
+
             response.setResult(true);
         } else {
             response.setResult(false);
@@ -61,17 +67,8 @@ public class IndexingServiceImpl implements IndexingService {
         if (!isStopped) {
             isStopped = true;
             fjp.shutdown(); // Disable new tasks from being submitted
-            try {
-                if (!fjp.awaitTermination(10, TimeUnit.SECONDS)) {
-                    fjp.shutdownNow(); // Cancel currently executing tasks
-                    if (!fjp.awaitTermination(10, TimeUnit.SECONDS)) {
-                        log.error(AnsiColor.ANSI_RED + "Pool did not terminate" + AnsiColor.ANSI_RESET);
-                    }
-                }
-            } catch (InterruptedException ie) {
-                fjp.shutdownNow(); // (Re-)Cancel if current thread also interrupted
-                Thread.currentThread().interrupt(); // Preserve interrupt status
-            }
+            fjpAwaitTermination();
+
             response.setResult(true);
         } else {
             response.setResult(false);
@@ -81,10 +78,24 @@ public class IndexingServiceImpl implements IndexingService {
     }
 
     @Override
-    public IndexingResponse indexPage() {
+    public IndexingResponse indexPage(String page) {
         IndexingResponse response = new IndexingResponse();
 
-        if (true) { // написать условие
+        String indexPage = URLDecoder.decode( page, StandardCharsets.UTF_8).substring(4);
+        List<Site> sites = sitesList.getSites();
+        int pageCount = 0;
+        for (Site site : sites) {
+            if (indexPage.startsWith(site.getUrl())) {
+                pageCount++;
+            }
+        }
+
+        if (pageCount > 0) {
+            System.out.println("Страница для индексации/переиндексации - " + indexPage);
+
+// что-то сделать дальше (индексировать?)
+
+
             response.setResult(true);
         } else {
             response.setResult(false);
@@ -120,32 +131,15 @@ public class IndexingServiceImpl implements IndexingService {
             long start = System.currentTimeMillis();
             fjp.invoke(parseLinks);
 
-            String parserAnswer;
+            String parserStatus;
             try {
-                parserAnswer = parseLinks.get();  // получаем ответ парсера
+                parserStatus = parseLinks.get();  // получаем ответ парсера
             } catch (InterruptedException | ExecutionException e) {
-                log.info(AnsiColor.ANSI_RED + "Что-то пошло не так..." + AnsiColor.ANSI_RESET);
+                log.info(AnsiColor.ANSI_RED + "С парсингом что-то пошло не так..." + AnsiColor.ANSI_RESET);
                 throw new RuntimeException(e);
             }
 
-            if (parserAnswer.matches("OK")) {
-                log.info(AnsiColor.ANSI_GREEN + "Индексация сайта " + siteUrl
-                        + " завершена" + AnsiColor.ANSI_RESET);
-                indexingSites.remove(siteName);
-                siteEntity.setStatus(IndexingStatus.INDEXED);
-                indexedSite(siteEntity, start);
-            } else if (parserAnswer.matches("Interrupted")) {
-                indexingSites.clear();
-                siteEntity.setStatus(IndexingStatus.FAILED);
-                siteEntity.setLastError("Индексация остановлена пользователем");
-                indexedSite(siteEntity, start);
-                log.info(AnsiColor.ANSI_YELLOW + "Индексация остановлена пользователем" + AnsiColor.ANSI_RESET);
-            } else if (parserAnswer.matches("UnknownHost")) {
-                indexingSites.remove(siteName);
-                siteEntity.setStatus(IndexingStatus.FAILED);
-                siteEntity.setLastError("Указанный сайт не найден");
-                indexedSite(siteEntity, start);
-            }
+            saveIndexedSite(siteEntity, parserStatus, start);
 
             if (indexingSites.isEmpty() && !isStopped) {
                 isStopped = true;
@@ -154,6 +148,19 @@ public class IndexingServiceImpl implements IndexingService {
         });
     }
 
+    private void fjpAwaitTermination() {
+        try {
+            if (!fjp.awaitTermination(10, TimeUnit.SECONDS)) {
+                fjp.shutdownNow(); // Cancel currently executing tasks
+                if (!fjp.awaitTermination(10, TimeUnit.SECONDS)) {
+                    log.error(AnsiColor.ANSI_RED + "Pool did not terminate" + AnsiColor.ANSI_RESET);
+                }
+            }
+        } catch (InterruptedException ie) {
+            fjp.shutdownNow(); // (Re-)Cancel if current thread also interrupted
+            Thread.currentThread().interrupt(); // Preserve interrupt status
+        }
+    }
 
     private SiteEntity indexingSite(String name, String url) {
         SiteEntity site = new SiteEntity();
@@ -164,19 +171,43 @@ public class IndexingServiceImpl implements IndexingService {
         return site;
     }
 
-    private void indexedSite(SiteEntity site, long start) {
-        int indexingTime = (int) ((System.currentTimeMillis() - start) / 1000);
-        int pagesCount = pageRepository.pagesCount(site.getId());
-        if (pagesCount > 0) {
-            log.info(AnsiColor.ANSI_GREEN + "Сайт " + site.getUrl()
-                    + ", проиндексировано " + pagesCount + " страниц "
-                    + "за " + indexingTime + " сек" + AnsiColor.ANSI_RESET);
+    private void saveIndexedSite(SiteEntity site, String parserStatus, long start) {
+        String siteUrl = site.getUrl();
+        String siteName = site.getName();
+        if (parserStatus.matches("OK")) {
+            log.info(AnsiColor.ANSI_GREEN + "Индексация сайта " + siteUrl
+                    + " завершена" + AnsiColor.ANSI_RESET);
+            indexingSites.remove(siteName);
+            indexedSite(site, start, "INDEXED", "");
+        } else if (parserStatus.matches("Interrupted")) {
+            indexingSites.clear();
+            indexedSite(site, start, "FAILED", "Индексация остановлена пользователем");
+            log.info(AnsiColor.ANSI_YELLOW + "Индексация сайта " + siteUrl
+                    + " остановлена пользователем" + AnsiColor.ANSI_RESET);
+        } else if (parserStatus.matches("UnknownHost")) {
+            indexingSites.remove(siteName);
+            indexedSite(site, start, "FAILED", "Указанный сайт не найден");
+            log.info(AnsiColor.ANSI_YELLOW + "Сайт " + siteUrl + " не найден!" + AnsiColor.ANSI_RESET);
         }
-        log.info("Индексируются сайты: " + AnsiColor.ANSI_PURPLE + indexingSites
-                + AnsiColor.ANSI_RESET);
+    }
 
+    private void indexedSite(SiteEntity site, long start, String status, String error) {
+        int indexingTime = (int) ((System.currentTimeMillis() - start) / 1000);
         site.setStatusTime(LocalDateTime.now());
         site.setIndexingTime(indexingTime);
+        if (status.matches("INDEXED")) {
+            site.setStatus(IndexingStatus.INDEXED);
+        } else {
+            site.setStatus(IndexingStatus.FAILED);
+        }
+        site.setLastError(error);
         siteRepository.save(site);
+
+        int pagesCount = pageRepository.pagesCount(site.getId());
+        if (pagesCount > 0) {
+            log.info(AnsiColor.ANSI_GREEN + "Сайт " + site.getUrl() + ", проиндексировано "
+                    + pagesCount + " страниц " + "за " + indexingTime + " сек" + AnsiColor.ANSI_RESET);
+        }
+        log.info("Индексируются сайты: " + AnsiColor.ANSI_PURPLE + indexingSites + AnsiColor.ANSI_RESET);
     }
 }

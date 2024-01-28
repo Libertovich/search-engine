@@ -1,15 +1,15 @@
 package searchengine.controllers;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.repository.query.Param;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 import searchengine.dto.indexing.IndexingResponse;
 import searchengine.dto.statistics.StatisticsResponse;
 import searchengine.services.IndexingService;
 import searchengine.services.StatisticsService;
+
+import java.io.UnsupportedEncodingException;
 
 @RestController
 @RequestMapping("/api")
@@ -29,8 +29,8 @@ public class ApiController {
     }
 
     @PostMapping("/indexPage")
-    public ResponseEntity<IndexingResponse> indexPage() {
-        return ResponseEntity.ok(indexingService.indexPage());
+    public ResponseEntity<IndexingResponse> indexPage(@RequestBody String page) throws UnsupportedEncodingException {
+        return ResponseEntity.ok(indexingService.indexPage(page));
     }
 
     @GetMapping("/search")

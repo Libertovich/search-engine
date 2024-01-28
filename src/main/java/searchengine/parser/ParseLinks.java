@@ -14,41 +14,42 @@ import searchengine.repositories.PageRepository;
 import searchengine.repositories.SiteRepository;
 import searchengine.services.IndexingServiceImpl;
 
+import java.net.URLDecoder;
 import java.net.UnknownHostException;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.ArrayList;
+import java.util.Map;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ForkJoinTask;
 import java.util.concurrent.RecursiveTask;
 
 @Log4j2
 @RequiredArgsConstructor
-//@ConfigurationProperties(prefix = "jsoup-settings") // настроить подключение
 public class ParseLinks extends RecursiveTask<String> {
     private final SiteEntity siteEntity;
     private final String ref;
-    private final RefsList refsList; // делал final нестатик, передавал из fjp как параметр. Время -3% и еще один параметр для передачи
+    private final RefsList refsList;
     private final SiteRepository siteRepository;
     private final PageRepository pageRepository;
-
+    private final static String EXTRACT_REGEX = "(.+(\\.(jpg|pdf|doc|png|docx|xlsx|jpeg|mp4))$)";
     @Override
     protected String compute() {
-        List<ParseLinks> taskList = new ArrayList<>();
-        String url = siteEntity.getUrl();
-
-//        try {
-//            Thread.sleep(5000);
-//        } catch (InterruptedException e) {
-//            throw new RuntimeException(e);
-//        }
+        /*try {
+            Thread.sleep(200);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }*/
 
         try {
             Connection.Response response = Jsoup.connect(ref)
-                    .userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/111.0.0.0 Safari/537.36 Edg/111.0.1661.62")
-                    .referrer("https://www.google.com")
+//                    .userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/111.0.0.0 Safari/537.36 Edg/111.0.1661.62")
+                    .userAgent("YandexBot")
+//                    .referrer("https://www.google.com")
+                    .referrer("Search engines")
                     .ignoreHttpErrors(true)
-//                    .timeout(5000)
-                    .followRedirects(true) // убирает коды НТТР 301 и 302
+                    .timeout(10000)
+//                    .followRedirects(true)
                     .execute();
 
             int statusCode = response.statusCode();
@@ -56,51 +57,64 @@ public class ParseLinks extends RecursiveTask<String> {
                 Document doc = response.parse();
                 savePage(statusCode, ref, doc.html(), siteEntity);
 //            saveStatusTime(); // зачем это нужно? сильно замедляет работу
-                Elements elements = doc.select("body").select("a");
-                for (Element link : elements) {
-                    String fetchedLink = link.absUrl("href");
-                    if (isCorrectLink(fetchedLink, url)) {
-                        if (!refsList.isRefPresent(fetchedLink) && !IndexingServiceImpl.isStopped) {
-                            refsList.addRef(fetchedLink);
 
-                            ParseLinks task = new ParseLinks(siteEntity, fetchedLink, refsList, siteRepository, pageRepository);
-                            task.fork();
-                            taskList.add(task);
-                        }
-                    }
-                }
-                taskList.forEach(ForkJoinTask::join);
+
+//                System.out.println("Title - " + doc.title());
+                System.out.println("---------------   " + ref);
+                System.out.println("Исходный текст: " + doc.text());
+                Lemmatizer lemmatizer = new Lemmatizer();
+                Map<String, Integer> lemmas = lemmatizer.getLemmas(doc.text());  // подумать что с этим делать
+
+//                lemmatizer.saveLemma(lemmas);
+
+                Elements elements = doc.select("body").select("a");
+                fetchLinks(elements);
             } else {
-                savePage(statusCode, ref, "Not found", siteEntity);
-                log.info(AnsiColor.ANSI_RED + "Exc: " + AnsiColor.ANSI_PURPLE
-                        + "HTTP 404, Not found, " + AnsiColor.ANSI_RESET + ref);
+                savePage(statusCode, ref, response.statusMessage(), siteEntity);
             }
         } catch (UnknownHostException e) {
-            log.info(AnsiColor.ANSI_RED + "Exc: " + AnsiColor.ANSI_PURPLE
-                    + "Сайт " + url + " не найден!" + AnsiColor.ANSI_RESET);
             return "UnknownHost";
         } catch (CancellationException cex) {
-            log.info(AnsiColor.ANSI_RED + "Exc: " + AnsiColor.ANSI_PURPLE
-                    + "Индексация " + url + " прервана пользователем" + AnsiColor.ANSI_RESET);
             return "Interrupted";
         } catch (Exception ex) {
-            httpCodeCheck(ex);
+            httpHandler(ex);
         }
 
-        if (IndexingServiceImpl.isStopped) {  // если нажата СТОП, но не весь сайт проиндексирован
+        if (IndexingServiceImpl.isStopped) { // если нажата СТОП, но не весь сайт проиндексирован
             return "Interrupted";
         }
 
         return "OK";
     }
 
-    private void savePage(int statusCode, String ref, String html, SiteEntity siteEntity) {
+    private void fetchLinks(Elements elements) {
+        List<ParseLinks> taskList = new ArrayList<>();
+        for (Element link : elements) {
+            String fetchedLink = URLDecoder.decode(link.absUrl("href"), StandardCharsets.UTF_8);
+            if (isCorrectLink(fetchedLink, siteEntity.getUrl()) &&
+                    (!refsList.isRefPresent(fetchedLink) && !IndexingServiceImpl.isStopped)) {
+                refsList.addRef(fetchedLink);
+
+                ParseLinks task = new ParseLinks(siteEntity, fetchedLink, refsList, siteRepository, pageRepository);
+                task.fork();
+                taskList.add(task);
+            }
+        }
+        taskList.forEach(ForkJoinTask::join);
+    }
+
+    private void savePage(int statusCode, String ref, String content, SiteEntity siteEntity) {
         PageEntity page = new PageEntity();
         page.setCode(statusCode);
         page.setPath(getRelativePath(ref));
-        page.setContent(html);
+        page.setContent(content);
         page.setSiteId(siteEntity);
         pageRepository.save(page);
+
+        if (statusCode != 200) {
+            log.info(AnsiColor.ANSI_PURPLE + "HTTP code: " + AnsiColor.ANSI_RED
+                    + statusCode + ", " + content + ", " + AnsiColor.ANSI_RESET + ref);
+        }
     }
 
     private String getRelativePath(String ref) {
@@ -114,23 +128,18 @@ public class ParseLinks extends RecursiveTask<String> {
                 && !fetchedLink.equals(siteUrl)
                 && !fetchedLink.equals(siteUrl.concat("/"))
                 && fetchedLink.matches("[^#?]+")
-                && !fetchedLink.matches("(.+(\\.(jpg|pdf|doc|png|docx|xlsx|jpeg))$)")
+                && !fetchedLink.matches(EXTRACT_REGEX)
                 && !fetchedLink.contains(".html/");
     }
 
-    private void httpCodeCheck(Exception ex) {
+    private void httpHandler(Exception ex) {
         String msg = ex.getMessage();
         if (msg.contains("Unhandled content type")) {
             savePage(405, ref, msg, siteEntity);
-            log.info(AnsiColor.ANSI_RED + "Exc: " + AnsiColor.ANSI_PURPLE
-                    + "HTTP 405, Unhandled content type, " + AnsiColor.ANSI_RESET + ref);
-        } else if (msg.contains("Status=500")) {
-            savePage(500, ref, msg, siteEntity);
-            log.error(AnsiColor.ANSI_RED + "Exc: "
-                    + "HTTP 500, Internal server error, " + AnsiColor.ANSI_RESET + ref);
+//        } else if (msg.contains("Status=500")) {
+//            savePage(500, ref, msg, siteEntity);
         } else {
             savePage(888, ref, msg, siteEntity);
-            log.info(AnsiColor.ANSI_RED + "Exc: " + msg + AnsiColor.ANSI_RESET + " " + ref);
         }
     }
 }
