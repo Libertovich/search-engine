@@ -1,9 +1,9 @@
 indexing-settings:
   sites: # формат url без слеша на конце
-#    - url: http://akvagaz.ru # 1 сек, страниц 53
-#      name: Аквагаз
-    - url: https://www.svetlovka.ru # 10 сек, страниц 236
-      name: Библиотека Светловка
+    - url: http://akvagaz.ru # 1 сек, страниц 53
+      name: Аквагаз
+#    - url: https://www.svetlovka.ru # 10 сек, страниц 236
+#      name: Библиотека Светловка
     - url: https://radiomv0.ru # 176 сек, страниц 172 (с задержкой 1500мс)
       name: Милицейская волна
 #    - url: https://playback.ru # 144 сек, страниц 2078

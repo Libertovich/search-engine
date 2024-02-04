@@ -9,9 +9,10 @@ import searchengine.config.SitesList;
 import searchengine.dto.indexing.IndexingResponse;
 import searchengine.parser.RefsList;
 import searchengine.model.*;
-import searchengine.parser.ParseLinks;
+import searchengine.parser.LinksParser;
 import searchengine.repositories.PageRepository;
 import searchengine.repositories.SiteRepository;
+import searchengine.repositories.LemmaRepository;
 
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
@@ -29,7 +30,7 @@ public class IndexingServiceImpl implements IndexingService {
     private final SitesList sitesList;
     private final SiteRepository siteRepository;
     private final PageRepository pageRepository;
-    //    private final LemmaRepository lemmaRepository;
+    private final LemmaRepository lemmaRepository;
     private List<String> indexingSites;
     private ForkJoinPool fjp;
     public static volatile boolean isStopped = true;
@@ -121,7 +122,7 @@ public class IndexingServiceImpl implements IndexingService {
         SiteEntity siteEntity = indexingSite(siteName, siteUrl);
         siteRepository.save(siteEntity);
 
-        ParseLinks parseLinks = new ParseLinks(siteEntity, siteUrl, new RefsList(), siteRepository, pageRepository);
+        LinksParser linksParser = new LinksParser(siteEntity, siteUrl, new RefsList(), siteRepository, pageRepository, lemmaRepository);
         return new Thread(() -> {
             indexingSites.add(siteName);  // записываем в служебный список индексируемый сайт
             log.info(AnsiColor.ANSI_GREEN + "Запускаем индексацию сайта "
@@ -129,11 +130,11 @@ public class IndexingServiceImpl implements IndexingService {
 
             fjp = new ForkJoinPool();
             long start = System.currentTimeMillis();
-            fjp.invoke(parseLinks);
+            fjp.invoke(linksParser);
 
             String parserStatus;
             try {
-                parserStatus = parseLinks.get();  // получаем ответ парсера
+                parserStatus = linksParser.get();  // получаем ответ парсера
             } catch (InterruptedException | ExecutionException e) {
                 log.info(AnsiColor.ANSI_RED + "С парсингом что-то пошло не так..." + AnsiColor.ANSI_RESET);
                 throw new RuntimeException(e);

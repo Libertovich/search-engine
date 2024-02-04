@@ -8,8 +8,10 @@ import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 import searchengine.config.AnsiColor;
+import searchengine.model.LemmaEntity;
 import searchengine.model.PageEntity;
 import searchengine.model.SiteEntity;
+import searchengine.repositories.LemmaRepository;
 import searchengine.repositories.PageRepository;
 import searchengine.repositories.SiteRepository;
 import searchengine.services.IndexingServiceImpl;
@@ -20,18 +22,20 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ForkJoinTask;
 import java.util.concurrent.RecursiveTask;
 
 @Log4j2
 @RequiredArgsConstructor
-public class ParseLinks extends RecursiveTask<String> {
+public class LinksParser extends RecursiveTask<String> {
     private final SiteEntity siteEntity;
     private final String ref;
     private final RefsList refsList;
     private final SiteRepository siteRepository;
     private final PageRepository pageRepository;
+    private final LemmaRepository lemmaRepository;
     private final static String EXTRACT_REGEX = "(.+(\\.(jpg|pdf|doc|png|docx|xlsx|jpeg|mp4))$)";
     @Override
     protected String compute() {
@@ -58,14 +62,21 @@ public class ParseLinks extends RecursiveTask<String> {
                 savePage(statusCode, ref, doc.html(), siteEntity);
 //            saveStatusTime(); // зачем это нужно? сильно замедляет работу
 
-
 //                System.out.println("Title - " + doc.title());
-                System.out.println("---------------   " + ref);
-                System.out.println("Исходный текст: " + doc.text());
+//                System.out.println(ref + " Исходный текст: " + doc.body().text());
                 Lemmatizer lemmatizer = new Lemmatizer();
-                Map<String, Integer> lemmas = lemmatizer.getLemmas(doc.text());  // подумать что с этим делать
+                Set<String> lemmas = lemmatizer.getLemmas(doc.body().text());
+                System.out.println(ref + " - " + lemmas.size() + " лемм"/*+ lemmas*/);
+
+                LemmaEntity lemma = new LemmaEntity();
+                lemma.setSiteId(siteEntity);
+                lemma.setLemma("какая-то лемма");
+                lemma.setFrequency(1);
+                lemmaRepository.save(lemma);
 
 //                lemmatizer.saveLemma(lemmas);
+//                StringBuilder builder = getBuilder(lemmas);
+//                lemmaRepository.add(Collections.singletonList(builder.toString()));
 
                 Elements elements = doc.select("body").select("a");
                 fetchLinks(elements);
@@ -77,7 +88,7 @@ public class ParseLinks extends RecursiveTask<String> {
         } catch (CancellationException cex) {
             return "Interrupted";
         } catch (Exception ex) {
-            httpHandler(ex);
+            handleException(ex);
         }
 
         if (IndexingServiceImpl.isStopped) { // если нажата СТОП, но не весь сайт проиндексирован
@@ -87,15 +98,27 @@ public class ParseLinks extends RecursiveTask<String> {
         return "OK";
     }
 
+    private static StringBuilder getBuilder(Map<String, Integer> lemmas) {
+        StringBuilder builder = new StringBuilder();
+        for (Map.Entry<String, Integer> map : lemmas.entrySet()) {
+            builder.append(" (");
+            builder.append(map.getKey());
+            builder.append(", ");
+            builder.append(map.getValue());
+            builder.append("),");
+        }
+        return builder.deleteCharAt(builder.lastIndexOf(","));
+    }
+
     private void fetchLinks(Elements elements) {
-        List<ParseLinks> taskList = new ArrayList<>();
+        List<LinksParser> taskList = new ArrayList<>();
         for (Element link : elements) {
             String fetchedLink = URLDecoder.decode(link.absUrl("href"), StandardCharsets.UTF_8);
             if (isCorrectLink(fetchedLink, siteEntity.getUrl()) &&
                     (!refsList.isRefPresent(fetchedLink) && !IndexingServiceImpl.isStopped)) {
                 refsList.addRef(fetchedLink);
 
-                ParseLinks task = new ParseLinks(siteEntity, fetchedLink, refsList, siteRepository, pageRepository);
+                LinksParser task = new LinksParser(siteEntity, fetchedLink, refsList, siteRepository, pageRepository, lemmaRepository);
                 task.fork();
                 taskList.add(task);
             }
@@ -112,7 +135,7 @@ public class ParseLinks extends RecursiveTask<String> {
         pageRepository.save(page);
 
         if (statusCode != 200) {
-            log.info(AnsiColor.ANSI_PURPLE + "HTTP code: " + AnsiColor.ANSI_RED
+            log.info(AnsiColor.ANSI_PURPLE + "Status code: " + AnsiColor.ANSI_RED
                     + statusCode + ", " + content + ", " + AnsiColor.ANSI_RESET + ref);
         }
     }
@@ -132,12 +155,10 @@ public class ParseLinks extends RecursiveTask<String> {
                 && !fetchedLink.contains(".html/");
     }
 
-    private void httpHandler(Exception ex) {
+    private void handleException(Exception ex) {
         String msg = ex.getMessage();
         if (msg.contains("Unhandled content type")) {
             savePage(405, ref, msg, siteEntity);
-//        } else if (msg.contains("Status=500")) {
-//            savePage(500, ref, msg, siteEntity);
         } else {
             savePage(888, ref, msg, siteEntity);
         }
