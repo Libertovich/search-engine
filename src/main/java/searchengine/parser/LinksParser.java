@@ -19,10 +19,7 @@ import searchengine.services.IndexingServiceImpl;
 import java.net.URLDecoder;
 import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
-import java.util.List;
-import java.util.ArrayList;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ForkJoinTask;
 import java.util.concurrent.RecursiveTask;
@@ -36,7 +33,11 @@ public class LinksParser extends RecursiveTask<String> {
     private final SiteRepository siteRepository;
     private final PageRepository pageRepository;
     private final LemmaRepository lemmaRepository;
+
     private final static String EXTRACT_REGEX = "(.+(\\.(jpg|pdf|doc|png|docx|xlsx|jpeg|mp4))$)";
+    //    private static LemmaEntitySet lemmaEntitySet = new LemmaEntitySet();
+    private volatile static Set<LemmaEntity> lemmaEntitySet = Collections.synchronizedSet(new HashSet<>());
+
     @Override
     protected String compute() {
         /*try {
@@ -68,15 +69,34 @@ public class LinksParser extends RecursiveTask<String> {
                 Set<String> lemmas = lemmatizer.getLemmas(doc.body().text());
                 System.out.println(ref + " - " + lemmas.size() + " лемм"/*+ lemmas*/);
 
-                LemmaEntity lemma = new LemmaEntity();
-                lemma.setSiteId(siteEntity);
-                lemma.setLemma("какая-то лемма");
-                lemma.setFrequency(1);
-                lemmaRepository.save(lemma);
+                for (String lemma : lemmas) {
+                    LemmaEntity lemmaEntity = new LemmaEntity();
 
-//                lemmatizer.saveLemma(lemmas);
-//                StringBuilder builder = getBuilder(lemmas);
-//                lemmaRepository.add(Collections.singletonList(builder.toString()));
+                    if (!lemmaEntitySet.isEmpty()) {
+                        int i = 0;
+                        for (LemmaEntity lemmaEnt : lemmaEntitySet) {
+                            if (lemmaEnt.getLemma().matches(lemma)) {
+                                lemmaEnt.setFrequency(lemmaEnt.getFrequency() + 1);
+                                i++;
+                                break;
+                            }
+                        }
+                        if (i == 0) {
+                            setLemmaEntity(lemmaEntity, lemma);
+                        }
+                    } else {
+                        setLemmaEntity(lemmaEntity, lemma);
+                    }
+                }
+
+                System.out.println("LemmaEntitySet - " + lemmaEntitySet.size());
+
+         /*       List<String> lemmaList = new ArrayList<>();
+                for (LemmaEntity lemma : lemmaEntitySet) {
+                    lemmaList.add(lemma.getLemma());
+                }
+                System.out.println(lemmaList);*/
+
 
                 Elements elements = doc.select("body").select("a");
                 fetchLinks(elements);
@@ -98,16 +118,11 @@ public class LinksParser extends RecursiveTask<String> {
         return "OK";
     }
 
-    private static StringBuilder getBuilder(Map<String, Integer> lemmas) {
-        StringBuilder builder = new StringBuilder();
-        for (Map.Entry<String, Integer> map : lemmas.entrySet()) {
-            builder.append(" (");
-            builder.append(map.getKey());
-            builder.append(", ");
-            builder.append(map.getValue());
-            builder.append("),");
-        }
-        return builder.deleteCharAt(builder.lastIndexOf(","));
+    private void setLemmaEntity(LemmaEntity lemmaEntity, String lemma) {
+        lemmaEntity.setSiteId(siteEntity);
+        lemmaEntity.setLemma(lemma);
+        lemmaEntity.setFrequency(1);
+        lemmaEntitySet.add(lemmaEntity);
     }
 
     private void fetchLinks(Elements elements) {
@@ -157,7 +172,9 @@ public class LinksParser extends RecursiveTask<String> {
 
     private void handleException(Exception ex) {
         String msg = ex.getMessage();
-        if (msg.contains("Unhandled content type")) {
+        if (msg == null) {
+            ex.printStackTrace();
+        } else if (msg.contains("Unhandled content type")) {
             savePage(405, ref, msg, siteEntity);
         } else {
             savePage(888, ref, msg, siteEntity);

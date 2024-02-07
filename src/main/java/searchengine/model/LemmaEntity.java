@@ -16,7 +16,7 @@ public class LemmaEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private int id;
 
-    @ManyToOne(cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @ManyToOne(cascade = CascadeType.MERGE, fetch = FetchType.LAZY)
     @OnDelete(action = OnDeleteAction.CASCADE)
     @JoinColumn(name = "site_id", nullable = false)
     private SiteEntity siteId;
@@ -25,7 +25,7 @@ public class LemmaEntity {
     private String lemma;
 
     // количество страниц, на которых слово встречается хотя бы один раз.
-    // Максимальное значение не может превышать общее количество слов на сайте
+    // Максимальное значение не может превышать общее количество слов (?, может страниц?) на сайте
     @Column(name = "frequency", nullable = false)
     private int frequency;
 }
