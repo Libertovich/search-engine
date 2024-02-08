@@ -35,8 +35,7 @@ public class LinksParser extends RecursiveTask<String> {
     private final LemmaRepository lemmaRepository;
 
     private final static String EXTRACT_REGEX = "(.+(\\.(jpg|pdf|doc|png|docx|xlsx|jpeg|mp4))$)";
-    //    private static LemmaEntitySet lemmaEntitySet = new LemmaEntitySet();
-    private volatile static Set<LemmaEntity> lemmaEntitySet = Collections.synchronizedSet(new HashSet<>());
+    private final static Set<LemmaEntity> lemmaEntitySet = Collections.synchronizedSet(new HashSet<>());
 
     @Override
     protected String compute() {
@@ -67,36 +66,18 @@ public class LinksParser extends RecursiveTask<String> {
 //                System.out.println(ref + " Исходный текст: " + doc.body().text());
                 Lemmatizer lemmatizer = new Lemmatizer();
                 Set<String> lemmas = lemmatizer.getLemmas(doc.body().text());
-                System.out.println(ref + " - " + lemmas.size() + " лемм"/*+ lemmas*/);
-
-                for (String lemma : lemmas) {
-                    LemmaEntity lemmaEntity = new LemmaEntity();
-
-                    if (!lemmaEntitySet.isEmpty()) {
-                        int i = 0;
-                        for (LemmaEntity lemmaEnt : lemmaEntitySet) {
-                            if (lemmaEnt.getLemma().matches(lemma)) {
-                                lemmaEnt.setFrequency(lemmaEnt.getFrequency() + 1);
-                                i++;
-                                break;
-                            }
-                        }
-                        if (i == 0) {
-                            setLemmaEntity(lemmaEntity, lemma);
-                        }
-                    } else {
-                        setLemmaEntity(lemmaEntity, lemma);
-                    }
+//                System.out.println(ref + " - " + lemmas.size() + " лемм"/*+ lemmas*/);
+                if (lemmas != null) {
+                    getLemmaEntitySet(lemmas);
                 }
 
-                System.out.println("LemmaEntitySet - " + lemmaEntitySet.size());
+                System.out.println(siteEntity.getUrl() + " - " + "LemmaEntitySet - " + lemmaEntitySet.size());
 
          /*       List<String> lemmaList = new ArrayList<>();
                 for (LemmaEntity lemma : lemmaEntitySet) {
                     lemmaList.add(lemma.getLemma());
                 }
                 System.out.println(lemmaList);*/
-
 
                 Elements elements = doc.select("body").select("a");
                 fetchLinks(elements);
@@ -115,10 +96,38 @@ public class LinksParser extends RecursiveTask<String> {
             return "Interrupted";
         }
 
+        synchronized (lemmaEntitySet) {
+            lemmaRepository.saveAll(lemmaEntitySet);
+        }
         return "OK";
     }
 
-    private void setLemmaEntity(LemmaEntity lemmaEntity, String lemma) {
+    private void getLemmaEntitySet(Set<String> lemmas) {
+        for (String lemma : lemmas) {
+            LemmaEntity lemmaEntity = new LemmaEntity();
+//                    synchronized (lemmaEntitySet) {
+            if (!lemmaEntitySet.isEmpty()) {
+                int i = 0;
+                synchronized (lemmaEntitySet) {
+                    for (LemmaEntity lemmaEnt : lemmaEntitySet) {
+                        if (lemmaEnt.getLemma().matches(lemma) && lemmaEnt.getSiteId().equals(siteEntity)) {  // добавить совпадение по siteEntity?
+                            lemmaEnt.setFrequency(lemmaEnt.getFrequency() + 1);
+                            i++;
+                            break;
+                        }
+                    }
+                }
+                if (i == 0) {
+                    addLemmaEntity(lemmaEntity, lemma);
+                }
+            } else {
+                addLemmaEntity(lemmaEntity, lemma);
+            }
+//                    }
+        }
+    }
+
+    private void addLemmaEntity(LemmaEntity lemmaEntity, String lemma) {
         lemmaEntity.setSiteId(siteEntity);
         lemmaEntity.setLemma(lemma);
         lemmaEntity.setFrequency(1);
