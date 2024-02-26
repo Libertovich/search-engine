@@ -122,7 +122,7 @@ public class IndexingServiceImpl implements IndexingService {
         SiteEntity siteEntity = indexingSite(siteName, siteUrl);
         siteRepository.save(siteEntity);
 
-        LinksParser linksParser = new LinksParser(siteEntity, siteUrl, new RefsList(), siteRepository, pageRepository, lemmaRepository);
+        LinksParser linksParser = new LinksParser(siteEntity, siteUrl, new RefsList(), siteRepository, pageRepository);
         return new Thread(() -> {
             indexingSites.add(siteName);  // записываем в служебный список индексируемый сайт
             log.info(AnsiColor.ANSI_GREEN + "Запускаем индексацию сайта "
@@ -139,6 +139,10 @@ public class IndexingServiceImpl implements IndexingService {
                 log.info(AnsiColor.ANSI_RED + "С парсингом что-то пошло не так..." + AnsiColor.ANSI_RESET);
                 throw new RuntimeException(e);
             }
+
+/*            synchronized (lemmaEntitySet) {
+                lemmaRepository.saveAll(lemmaEntitySet);
+            }*/
 
             saveIndexedSite(siteEntity, parserStatus, start);
 

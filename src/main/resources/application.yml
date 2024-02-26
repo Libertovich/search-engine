@@ -2,12 +2,12 @@ indexing-settings:
   sites: # формат url без слеша на конце
     - url: http://akvagaz.ru # 1 сек, страниц 53, лемм 1347
       name: Аквагаз
-#    - url: https://www.svetlovka.ru # 10 сек, страниц 244, лемм 7578
-#      name: Библиотека Светловка
+    - url: https://www.svetlovka.ru # 10 сек, страниц 223, лемм 7383
+      name: Библиотека Светловка
     - url: https://radiomv0.ru # 176 сек, страниц 172 (с задержкой 1500мс)
       name: Милицейская волна
-    - url: https://playback.ru # 144 сек, страниц 2146, лемм 3431
-      name: PlayBack.Ru
+#    - url: https://playback.ru # 144 сек, страниц 2096, лемм 3409
+#      name: PlayBack.Ru
 #    - url: https://dombulgakova.ru # 147 сек, страниц 529, (поменять userAgent, иногда ввести задержку)
 #      name: Дом Булгакова
 #    - url: https://ipfran.ru # 330 сек, страниц 1046

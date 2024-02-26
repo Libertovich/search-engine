@@ -21,6 +21,7 @@ import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.CancellationException;
+import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.ForkJoinTask;
 import java.util.concurrent.RecursiveTask;
 
@@ -32,10 +33,11 @@ public class LinksParser extends RecursiveTask<String> {
     private final RefsList refsList;
     private final SiteRepository siteRepository;
     private final PageRepository pageRepository;
-    private final LemmaRepository lemmaRepository;
+//    private final LemmaRepository lemmaRepository;
 
     private final static String EXTRACT_REGEX = "(.+(\\.(jpg|pdf|doc|png|docx|xlsx|jpeg|mp4))$)";
-    private final static Set<LemmaEntity> lemmaEntitySet = Collections.synchronizedSet(new HashSet<>());
+    //    private final static Set<LemmaEntity> lemmaEntitySet = Collections.synchronizedSet(new HashSet<>());
+    private final static Set<LemmaEntity> lemmaEntitySet = new ConcurrentSkipListSet<>();
 
     @Override
     protected String compute() {
@@ -66,18 +68,10 @@ public class LinksParser extends RecursiveTask<String> {
 //                System.out.println(ref + " Исходный текст: " + doc.body().text());
                 Lemmatizer lemmatizer = new Lemmatizer();
                 Set<String> lemmas = lemmatizer.getLemmas(doc.body().text());
-//                System.out.println(ref + " - " + lemmas.size() + " лемм"/*+ lemmas*/);
+
                 if (lemmas != null) {
-                    getLemmaEntitySet(lemmas);
+                    lemmas.forEach(this::saveLemma);
                 }
-
-                System.out.println(siteEntity.getUrl() + " - " + "LemmaEntitySet - " + lemmaEntitySet.size());
-
-         /*       List<String> lemmaList = new ArrayList<>();
-                for (LemmaEntity lemma : lemmaEntitySet) {
-                    lemmaList.add(lemma.getLemma());
-                }
-                System.out.println(lemmaList);*/
 
                 Elements elements = doc.select("body").select("a");
                 fetchLinks(elements);
@@ -96,34 +90,27 @@ public class LinksParser extends RecursiveTask<String> {
             return "Interrupted";
         }
 
-        synchronized (lemmaEntitySet) {
-            lemmaRepository.saveAll(lemmaEntitySet);
-        }
+        System.out.println(siteEntity.getUrl() + " - " + "LemmaEntitySet - " + lemmaEntitySet.size());
+
         return "OK";
     }
 
-    private void getLemmaEntitySet(Set<String> lemmas) {
-        for (String lemma : lemmas) {
-            LemmaEntity lemmaEntity = new LemmaEntity();
-//                    synchronized (lemmaEntitySet) {
-            if (!lemmaEntitySet.isEmpty()) {
-                int i = 0;
-                synchronized (lemmaEntitySet) {
-                    for (LemmaEntity lemmaEnt : lemmaEntitySet) {
-                        if (lemmaEnt.getLemma().matches(lemma) && lemmaEnt.getSiteId().equals(siteEntity)) {  // добавить совпадение по siteEntity?
-                            lemmaEnt.setFrequency(lemmaEnt.getFrequency() + 1);
-                            i++;
-                            break;
-                        }
-                    }
+    private void saveLemma(String lemma) {
+        LemmaEntity lemmaEntity = new LemmaEntity();
+        if (!lemmaEntitySet.isEmpty()) {
+            int i = 0;
+            for (LemmaEntity lemmaEnt : lemmaEntitySet) {
+                if (lemmaEnt.getLemma().matches(lemma) && lemmaEnt.getSiteId().equals(siteEntity)) {
+                    lemmaEnt.setFrequency(lemmaEnt.getFrequency() + 1);
+                    i++;
+                    break;
                 }
-                if (i == 0) {
-                    addLemmaEntity(lemmaEntity, lemma);
-                }
-            } else {
+            }
+            if (i == 0) {
                 addLemmaEntity(lemmaEntity, lemma);
             }
-//                    }
+        } else {
+            addLemmaEntity(lemmaEntity, lemma);
         }
     }
 
@@ -142,7 +129,7 @@ public class LinksParser extends RecursiveTask<String> {
                     (!refsList.isRefPresent(fetchedLink) && !IndexingServiceImpl.isStopped)) {
                 refsList.addRef(fetchedLink);
 
-                LinksParser task = new LinksParser(siteEntity, fetchedLink, refsList, siteRepository, pageRepository, lemmaRepository);
+                LinksParser task = new LinksParser(siteEntity, fetchedLink, refsList, siteRepository, pageRepository);
                 task.fork();
                 taskList.add(task);
             }

@@ -11,7 +11,7 @@ import org.hibernate.annotations.OnDeleteAction;
 @Setter
 @Entity
 @Table(name = "lemma")
-public class LemmaEntity {
+public class LemmaEntity implements Comparable<LemmaEntity> {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private int id;
@@ -25,7 +25,16 @@ public class LemmaEntity {
     private String lemma;
 
     // количество страниц, на которых слово встречается хотя бы один раз.
-    // Максимальное значение не может превышать общее количество слов (?, может страниц?) на сайте
+    // Максимальное значение не может превышать общее количество слов (???, может страниц?) на сайте
     @Column(name = "frequency", nullable = false)
     private int frequency;
+
+    @Override
+    public int compareTo(LemmaEntity other) {
+        int result = this.lemma.compareTo(other.getLemma());
+        if (result == 0) {
+            result = this.siteId.getId().compareTo(other.getSiteId().getId());
+        }
+        return result;
+    }
 }
