@@ -19,6 +19,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.TimeUnit;
@@ -122,7 +123,7 @@ public class IndexingServiceImpl implements IndexingService {
         SiteEntity siteEntity = indexingSite(siteName, siteUrl);
         siteRepository.save(siteEntity);
 
-        LinksParser linksParser = new LinksParser(siteEntity, siteUrl, new RefsList(), siteRepository, pageRepository);
+        LinksParser linksParser = new LinksParser(siteEntity, siteUrl, new RefsList(), /*siteRepository,*/ pageRepository);
         return new Thread(() -> {
             indexingSites.add(siteName);  // записываем в служебный список индексируемый сайт
             log.info(AnsiColor.ANSI_GREEN + "Запускаем индексацию сайта "
@@ -132,21 +133,22 @@ public class IndexingServiceImpl implements IndexingService {
             long start = System.currentTimeMillis();
             fjp.invoke(linksParser);
 
-            String parserStatus;
+//            String parserStatus;
+            Set<LemmaEntity> lemmaEntitySet;
             try {
-                parserStatus = linksParser.get();  // получаем ответ парсера
+//                parserStatus = linksParser.get();  // получаем ответ парсера
+                lemmaEntitySet = linksParser.get();
             } catch (InterruptedException | ExecutionException e) {
+                System.out.println("Приплыли... " + e.getMessage());
                 log.info(AnsiColor.ANSI_RED + "С парсингом что-то пошло не так..." + AnsiColor.ANSI_RESET);
                 throw new RuntimeException(e);
             }
 
-/*            synchronized (lemmaEntitySet) {
-                lemmaRepository.saveAll(lemmaEntitySet);
-            }*/
-
-            saveIndexedSite(siteEntity, parserStatus, start);
+            saveIndexedSite(siteEntity, /*parserStatus*/ "OK", start);
 
             if (indexingSites.isEmpty() && !isStopped) {
+//                System.out.println("Lemmas - " + lemmaEntitySet.size());
+                lemmaRepository.saveAll(lemmaEntitySet);
                 isStopped = true;
                 log.info(AnsiColor.ANSI_CYAN + "Индексация завершена" + AnsiColor.ANSI_RESET);
             }

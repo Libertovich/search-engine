@@ -2,6 +2,7 @@ package searchengine.parser;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
+import org.hibernate.sql.exec.ExecutionException;
 import org.jsoup.Connection;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
@@ -11,9 +12,7 @@ import searchengine.config.AnsiColor;
 import searchengine.model.LemmaEntity;
 import searchengine.model.PageEntity;
 import searchengine.model.SiteEntity;
-import searchengine.repositories.LemmaRepository;
 import searchengine.repositories.PageRepository;
-import searchengine.repositories.SiteRepository;
 import searchengine.services.IndexingServiceImpl;
 
 import java.net.URLDecoder;
@@ -27,20 +26,18 @@ import java.util.concurrent.RecursiveTask;
 
 @Log4j2
 @RequiredArgsConstructor
-public class LinksParser extends RecursiveTask<String> {
+public class LinksParser extends RecursiveTask<Set<LemmaEntity>> {
     private final SiteEntity siteEntity;
     private final String ref;
     private final RefsList refsList;
-    private final SiteRepository siteRepository;
+    //    private final SiteRepository siteRepository;
     private final PageRepository pageRepository;
-//    private final LemmaRepository lemmaRepository;
 
     private final static String EXTRACT_REGEX = "(.+(\\.(jpg|pdf|doc|png|docx|xlsx|jpeg|mp4))$)";
-    //    private final static Set<LemmaEntity> lemmaEntitySet = Collections.synchronizedSet(new HashSet<>());
     private final static Set<LemmaEntity> lemmaEntitySet = new ConcurrentSkipListSet<>();
 
     @Override
-    protected String compute() {
+    protected Set<LemmaEntity> compute() throws ExecutionException {
         /*try {
             Thread.sleep(200);
         } catch (InterruptedException e) {
@@ -79,20 +76,21 @@ public class LinksParser extends RecursiveTask<String> {
                 savePage(statusCode, ref, response.statusMessage(), siteEntity);
             }
         } catch (UnknownHostException e) {
-            return "UnknownHost";
+            throw new ExecutionException(e.getMessage());
+//            return "UnknownHost";
         } catch (CancellationException cex) {
-            return "Interrupted";
+//            return "Interrupted";
         } catch (Exception ex) {
             handleException(ex);
         }
 
         if (IndexingServiceImpl.isStopped) { // если нажата СТОП, но не весь сайт проиндексирован
-            return "Interrupted";
+            System.out.println("Indexing interrupted");
+//            return "Interrupted";
         }
 
-        System.out.println(siteEntity.getUrl() + " - " + "LemmaEntitySet - " + lemmaEntitySet.size());
-
-        return "OK";
+        return lemmaEntitySet;
+//        return "OK";
     }
 
     private void saveLemma(String lemma) {
@@ -129,7 +127,7 @@ public class LinksParser extends RecursiveTask<String> {
                     (!refsList.isRefPresent(fetchedLink) && !IndexingServiceImpl.isStopped)) {
                 refsList.addRef(fetchedLink);
 
-                LinksParser task = new LinksParser(siteEntity, fetchedLink, refsList, siteRepository, pageRepository);
+                LinksParser task = new LinksParser(siteEntity, fetchedLink, refsList, /*siteRepository,*/ pageRepository);
                 task.fork();
                 taskList.add(task);
             }
